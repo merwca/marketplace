@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  banned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings Listing[]
+  reports  Report[]
+
+  @@map("users")
+}
+
+model Listing {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  price        Decimal?
+  category     Category
+  city         String
+  images       String[]
+  contactEmail String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reports Report[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([city])
+  @@map("listings")
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  reason    String
+  createdAt DateTime @default(now())
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("reports")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Category {
+  FOR_SALE
+  HOUSING
+  JOBS
+  SERVICES
+  COMMUNITY
+  VEHICLES
+  ELECTRONICS
+}
