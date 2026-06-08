@@ -1,27 +1,14 @@
 {
-  "name": "@anthropic-ai/claude-code-linux-x64",
-  "version": "2.1.139",
-  "description": "Native binary for Claude Code on linux-x64",
-  "os": [
-    "linux"
-  ],
-  "cpu": [
-    "x64"
-  ],
-  "libc": [
-    "glibc"
-  ],
-  "license": "SEE LICENSE IN LICENSE.md",
-  "files": [
-    "claude",
-    "README.md",
-    "LICENSE.md"
-  ],
+  "name": "marketplace",
+  "private":"true",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
   "dependencies": {
-    "next": "file:next-16.2.6.tgz",
-    "postcss": "file:postcss-8.4.31.tgz",
-    "react": "file:react-19.2.6.tgz",
-    "react-dom": "file:react-dom-19.2.6.tgz",
-    "styled-jsx": "file:styled-jsx-5.1.6.tgz"
+    "next": "^16.2.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   }
 }
