@@ -7,7 +7,13 @@ interface ImageCarouselProps {
   title: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+// Get image URL base - supports multiple deployment scenarios
+const getImageBase = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  return "";
+};
 
 export default function ImageCarousel({ images, title }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -26,7 +32,8 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
   }
 
   const currentImage = images[currentIndex];
-  const imageUrl = currentImage.startsWith("http") ? currentImage : `${API_URL}/uploads/${currentImage}`;
+  const base = getImageBase();
+  const imageUrl = currentImage.startsWith("http") ? currentImage : `${base}/uploads/${currentImage}`;
   const hasError = imageErrors[currentIndex];
   const isLoaded = imageLoaded[currentIndex];
 
@@ -131,7 +138,7 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
                     </div>
                   )}
                   <img
-                    src={img.startsWith("http") ? img : `${API_URL}/uploads/${img}`}
+                    src={img.startsWith("http") ? img : `${base}/uploads/${img}`}
                     alt={`Image ${i + 1}`}
                     className="w-full h-full object-cover"
                     onLoad={() => handleImageLoad(i)}

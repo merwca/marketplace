@@ -5,7 +5,13 @@ import Link from "next/link";
 import { Listing } from "@/types";
 import { formatPrice } from "@/lib/utils";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+// Get image URL base - supports multiple deployment scenarios
+const getImageBase = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  return "";
+};
 
 interface ListingCardProps {
   listing: Listing;
@@ -19,7 +25,8 @@ export default function ListingCard({ listing }: ListingCardProps) {
   const getImageUrl = (filename: string) => {
     if (!filename) return null;
     if (filename.startsWith("http")) return filename;
-    return `${API_URL}/uploads/${filename}`;
+    const base = getImageBase();
+    return `${base}/uploads/${filename}`;
   };
 
   const imageUrl = rawImg ? getImageUrl(rawImg) : null;

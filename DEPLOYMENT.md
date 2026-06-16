@@ -1,234 +1,306 @@
 # Deployment Guide
 
-This guide covers deploying the marketplace application to production using:
-- **Frontend**: Vercel
-- **Backend**: Railway or Render
-- **Database**: PostgreSQL (Railway, Neon, or Supabase)
+## Overview
 
-## Prerequisites
+This guide covers deploying the Marketplace application to different environments.
 
-- Git repository (GitHub recommended)
-- Accounts on deployment platforms
-- `git` and `docker` installed locally (for testing)
+## Development Setup
 
----
-
-## Local Testing
-
-Before deploying, test locally with Docker Compose:
+### Local Development with Docker Compose
 
 ```bash
-cp .env.example .env
+# Clone the repository
+git clone <repository>
+cd marketplace
 
-# Update .env with strong JWT_SECRET
-JWT_SECRET="generate-a-strong-random-string"
+# Start all services
+docker-compose up
 
-docker compose up
+# The app will be available at:
+# - Frontend: http://localhost:3000
+# - Backend API: http://localhost:4000
 ```
 
-Visit http://localhost:3000. Default credentials:
-- Email: user1@example.com
-- Password: user123
-
----
-
-## Database Setup (Choose One)
-
-### Option 1: Railway (Recommended)
-
-1. Create PostgreSQL database on Railway
-2. Copy the connection URL
-3. Note the URL format: `postgresql://user:password@host:port/database`
-
-### Option 2: Supabase
-
-1. Create new project on supabase.com
-2. Go to Settings → Database → Connection string
-3. Copy PostgreSQL URI
-
-### Option 3: Neon
-
-1. Create project on neon.tech
-2. Copy connection string from "Connection string" tab
-
----
-
-## Backend Deployment (Railway/Render)
-
-### On Railway
-
-1. Push code to GitHub
-2. Create new project on Railway dashboard
-3. Connect GitHub repository
-4. Add PostgreSQL plugin
-5. Set environment variables:
-   ```
-   DATABASE_URL=<from railway>
-   JWT_SECRET=<strong random key>
-   NODE_ENV=production
-   FRONTEND_URL=https://your-frontend-url.com
-   ```
-6. Railway auto-deploys on push
-7. Note the backend URL (e.g., `https://marketplace-api.railway.app`)
-
-### On Render
-
-1. Create new Web Service
-2. Connect to GitHub repo
-3. Set build command: `cd backend && npm install && npm run build`
-4. Set start command: `cd backend && npm start`
-5. Add PostgreSQL instance
-6. Set environment variables
-7. Deploy
-
----
-
-## Frontend Deployment (Vercel)
-
-1. Push code to GitHub
-2. Go to vercel.com → New Project
-3. Import your GitHub repository
-4. Framework: Next.js (auto-detected)
-5. Root Directory: `frontend`
-6. Build Command: `npm run build`
-7. Start Command: `npm start`
-8. Environment Variables:
-   ```
-   NEXT_PUBLIC_API_URL=https://your-backend.railway.app
-   ```
-9. Deploy
-
----
-
-## Post-Deployment Steps
-
-### 1. Run Database Migrations
-
-After backend is deployed, run migrations:
-
+**Database Setup:**
 ```bash
-# Via Railway/Render console or local:
-DATABASE_URL="postgresql://..." npx prisma migrate deploy
+# Run database migrations and seed data
+cd backend
+npm run db:seed
 ```
 
-### 2. Seed Database (Optional)
+## Production Deployment
 
+### Architecture Recommendation
+
+For production, use a **reverse proxy** (nginx/Apache) to serve both frontend and backend from the same origin:
+
+```
+┌─────────────────┐
+│   Browser       │
+└────────┬────────┘
+         │
+    ┌────▼─────────────────────────┐
+    │   Reverse Proxy (nginx)      │
+    │ • Serves static files        │
+    │ • Proxies /api/* to backend  │
+    └────┬──────────────────────┬──┘
+         │                      │
+    ┌────▼──────┐          ┌───▼────────┐
+    │ Frontend   │          │  Backend   │
+    │ (Next.js)  │          │  (Node.js) │
+    └───────────┘          └────────────┘
+```
+
+### Benefits of Reverse Proxy Approach
+
+✅ **Single Origin**: Frontend and backend on same domain
+✅ **CORS-Free**: No CORS issues with relative paths
+✅ **Flexible**: Easy to change API location without rebuilding
+✅ **Performance**: Can add caching layers
+✅ **Security**: Hide internal service locations
+
+### Configuration by Deployment Type
+
+#### Option 1: Reverse Proxy (Recommended for Production)
+
+**Environment Variables:**
 ```bash
-DATABASE_URL="postgresql://..." npx prisma db seed
+NEXT_PUBLIC_API_URL=          # Leave empty - use relative paths
+JWT_SECRET=<strong-random>    # Generate: openssl rand -base64 32
+DATABASE_URL=postgresql://... # Your production database
+NODE_ENV=production
 ```
 
-### 3. Update CORS
+**Nginx Configuration Example:**
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
 
-Backend `app.ts` needs frontend URL:
+    # Serve frontend
+    location / {
+        proxy_pass http://frontend:3000;
+    }
 
+    # Proxy API requests
+    location /api/ {
+        proxy_pass http://backend:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Serve uploaded images
+    location /uploads/ {
+        proxy_pass http://backend:4000;
+    }
+}
+```
+
+#### Option 2: Separate Domains
+
+**Frontend Environment:**
+```bash
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+```
+
+**Backend Configuration:**
+- Enable CORS for `https://www.yourdomain.com`
+- Add to `backend/src/app.ts`:
 ```typescript
-cors({ origin: "https://your-frontend.vercel.app" })
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || true,
+    credentials: true
+}));
 ```
 
-Update `.env` on backend:
-```
-FRONTEND_URL=https://your-frontend.vercel.app
+## Docker Production Build
+
+### Multi-Stage Build (Optimized for Production)
+
+**Backend Dockerfile:**
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY --from=builder /app/dist ./dist
+EXPOSE 4000
+CMD ["node", "dist/app.js"]
 ```
 
-### 4. Test Endpoints
+**Frontend Dockerfile:**
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY --from=builder /app/.next ./.next
+COPY public ./public
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+### Deploy Commands
 
 ```bash
-# Test backend health
-curl https://your-backend.railway.app/health
+# Build images
+docker-compose -f docker-compose.prod.yml build
 
-# Test login
-curl -X POST https://your-backend.railway.app/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user1@example.com","password":"user123"}'
+# Run containers
+docker-compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Stop services
+docker-compose -f docker-compose.prod.yml down
 ```
 
----
+## Security Checklist
 
-## Troubleshooting
+- [ ] Change `JWT_SECRET` to a strong random value
+- [ ] Use strong database password
+- [ ] Enable HTTPS/TLS (SSL certificate)
+- [ ] Set `NODE_ENV=production`
+- [ ] Configure firewall rules
+- [ ] Set up database backups
+- [ ] Configure rate limiting
+- [ ] Enable CORS properly
+- [ ] Use environment variables for secrets (not in .env file)
+- [ ] Keep dependencies updated
+- [ ] Set up monitoring and logging
+- [ ] Configure automated backups
 
-### Backend won't start
-- Check DATABASE_URL format
-- Ensure all environment variables are set
-- Check logs: `docker logs <container_id>`
+## Environment Variables
 
-### Frontend shows 500 errors
-- Verify NEXT_PUBLIC_API_URL is correct
-- Check CORS on backend (update origin)
-- Check browser console for errors
+### Required for Production
 
-### Images not displaying
-- Verify upload directory is writable
-- Check IMAGE_URL environment variable
-- Ensure file permissions on server
+```bash
+# Backend
+DATABASE_URL=postgresql://user:password@host:5432/marketplace
+JWT_SECRET=<strong-random-secret>
+NODE_ENV=production
+PORT=4000
 
-### Slow performance
-- Add database indexes (Prisma already has them)
-- Enable CDN for images (e.g., Cloudinary)
-- Use Next.js Image component for optimization
+# Frontend
+NEXT_PUBLIC_API_URL=  # Leave empty for reverse proxy, or set to API URL
+```
 
-### Out of disk space
-- Implement image cleanup cron job
-- Set max file size limits
-- Monitor uploads directory
+### Optional
 
----
+```bash
+# Frontend
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+FRONTEND_PORT=3000
+
+# Backend
+BACKEND_PORT=4000
+```
 
 ## Scaling Considerations
 
-### High Traffic
-- Add caching layer (Redis)
-- Implement CDN for images
-- Horizontal scaling with load balancer
+### Horizontal Scaling
 
-### Database
-- Enable connection pooling
-- Monitor slow queries
-- Archive old listings
+For multiple backend instances:
 
-### Security
-- Enable HTTPS (automatic on Vercel/Railway)
-- Implement rate limiting (already done)
-- Regular security audits
-- Backup database daily
+1. Use a load balancer (AWS ELB, nginx, etc.)
+2. Configure sticky sessions if needed
+3. Ensure database can handle multiple connections
+4. Use shared file storage for uploads (S3, Azure Blob, etc.)
 
----
+### File Storage in Production
 
-## Monitoring
+Currently, images are stored locally in `/uploads`. For production:
 
-Recommended monitoring services:
-- **Errors**: Sentry
-- **Performance**: New Relic, Datadog
-- **Uptime**: UptimeRobot, StatusPage.io
-- **Logs**: Logtail, ELK Stack
+**Option 1: S3/Cloud Storage**
+- Install aws-sdk
+- Update upload middleware to use S3
+- Update image URLs to use S3 URLs
 
----
+**Option 2: Shared Filesystem**
+- Mount shared volume to all backend instances
+- Use NFS or distributed filesystem
 
-## Rollback
+**Option 3: CDN**
+- Upload to CDN
+- Serve images from CDN URL
 
-If deployment fails:
+## Monitoring and Logging
+
+### Recommended Tools
+
+- **Monitoring**: Prometheus + Grafana, DataDog, New Relic
+- **Logging**: ELK Stack, Splunk, CloudWatch
+- **APM**: New Relic, DataDog, Elastic APM
+- **Uptime**: UptimeRobot, Pingdom
+
+### Key Metrics
+
+- API response times
+- Database query times
+- Error rates
+- Uptime percentage
+- CPU/Memory usage
+- Database connections
+
+## Database Backups
 
 ```bash
-# Git rollback
-git revert <commit-hash>
-git push
-
-# Vercel auto-redeploys
-# Railway/Render: manually select previous deployment
+# Automated daily backups with pg_dump
+0 2 * * * pg_dump $DATABASE_URL > /backups/marketplace-$(date +\%Y\%m\%d).sql
 ```
 
----
+## Troubleshooting
 
-## Production Checklist
+### API URL Issues
 
-- [ ] Database backups configured
-- [ ] Environment variables set securely
-- [ ] SSL/HTTPS enabled
-- [ ] CORS properly configured
-- [ ] Rate limiting active
-- [ ] Error logging active
-- [ ] Monitoring set up
-- [ ] Seed data removed from production
-- [ ] JWT_SECRET is strong and unique
-- [ ] Frontend and backend URLs match
-- [ ] Image upload directory writable
-- [ ] Database migrations ran successfully
+**Symptom**: Images/API calls not working
+
+**Solutions**:
+1. Check `NEXT_PUBLIC_API_URL` matches actual backend location
+2. For relative paths, ensure reverse proxy is configured
+3. Check browser console for CORS errors
+4. Verify backend is accessible from frontend origin
+
+### Database Connection Issues
+
+**Symptom**: "Cannot connect to database"
+
+**Solutions**:
+1. Verify `DATABASE_URL` is correct
+2. Check database service is running
+3. Verify network connectivity
+4. Check database user permissions
+5. Review database logs
+
+## Rollback Procedure
+
+```bash
+# Keep previous images
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml up -d  # Use old image tag
+```
+
+## Support
+
+For deployment issues, check:
+- Docker logs: `docker-compose logs -f service_name`
+- Backend logs: In application directory
+- Database logs: PostgreSQL logs
+- Reverse proxy logs: nginx/Apache logs

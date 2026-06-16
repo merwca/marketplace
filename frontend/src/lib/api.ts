@@ -1,4 +1,25 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// Get API base URL - supports multiple deployment scenarios:
+// 1. Production (default): Use relative paths - works automatically with reverse proxy
+// 2. Development: Use NEXT_PUBLIC_API_URL env var (e.g., http://localhost:4000)
+// 3. Docker Compose: Set NEXT_PUBLIC_API_URL in docker-compose.yml
+const getApiUrl = (): string => {
+  // If explicitly configured via environment variable, use it
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  // In browser, check if API is on same origin (production with reverse proxy)
+  if (typeof window !== "undefined") {
+    // In development, frontend might be on different port
+    // Set NEXT_PUBLIC_API_URL to override this behavior
+    return "";
+  }
+
+  // Server-side: use relative paths
+  return "";
+};
+
+const API_URL = getApiUrl();
 
 export class ApiError extends Error {
   constructor(
@@ -14,6 +35,24 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
+export function get(endpoint: string) {
+  return apiCall(endpoint, { method: "GET" });
+}
+
+export function post(endpoint: string, data: Record<string, any>) {
+  return apiCall(endpoint, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function put(endpoint: string, data: Record<string, any>) {
+  return apiCall(endpoint, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -21,9 +60,8 @@ export async function apiCall<T>(
   const url = `${API_URL}${endpoint}`;
   const token = getToken();
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...options.headers,
   };
 
   if (token) {
@@ -32,7 +70,7 @@ export async function apiCall<T>(
 
   const response = await fetch(url, {
     ...options,
-    headers,
+    headers: { ...headers, ...(options.headers as Record<string, string>) },
   });
 
   if (!response.ok) {
@@ -90,7 +128,7 @@ export function getListing(id: string) {
 
 export function createListing(data: FormData) {
   const token = getToken();
-  const headers: HeadersInit = {};
+  const headers: Record<string, string> = {};
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -100,8 +138,12 @@ export function createListing(data: FormData) {
     method: "POST",
     headers,
     body: data,
-  }).then((res) => {
-    if (!res.ok) throw new ApiError(res.status, "Failed to create listing");
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = body.details?.map((d: any) => d.message).join(", ");
+      throw new ApiError(res.status, detail || body.error || "Failed to create listing");
+    }
     return res.json();
   });
 }
