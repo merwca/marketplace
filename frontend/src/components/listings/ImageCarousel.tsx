@@ -11,6 +11,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function ImageCarousel({ images, title }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState<Record<number, boolean>>({});
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   if (images.length === 0) {
@@ -27,6 +28,7 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
   const currentImage = images[currentIndex];
   const imageUrl = currentImage.startsWith("http") ? currentImage : `${API_URL}/uploads/${currentImage}`;
   const hasError = imageErrors[currentIndex];
+  const isLoaded = imageLoaded[currentIndex];
 
   const goToPrevious = () => {
     setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
@@ -36,8 +38,13 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
     setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
+  const handleImageLoad = (index: number) => {
+    setImageLoaded((prev) => ({ ...prev, [index]: true }));
+  };
+
   const handleImageError = (index: number) => {
     setImageErrors((prev) => ({ ...prev, [index]: true }));
+    setImageLoaded((prev) => ({ ...prev, [index]: true }));
   };
 
   return (
@@ -51,12 +58,23 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
             <span className="text-gray-500 text-sm">Failed to load image</span>
           </div>
         ) : (
-          <img
-            src={imageUrl}
-            alt={title}
-            className="w-full h-full object-cover"
-            onError={() => handleImageError(currentIndex)}
-          />
+          <>
+            {!isLoaded && (
+              <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center z-10">
+                <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            )}
+            <img
+              src={imageUrl}
+              alt={title}
+              className="w-full h-full object-cover transition-opacity duration-300"
+              onLoad={() => handleImageLoad(currentIndex)}
+              onError={() => handleImageError(currentIndex)}
+            />
+          </>
         )}
 
         {images.length > 1 && (
@@ -92,7 +110,7 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
             <button
               key={i}
               onClick={() => setCurrentIndex(i)}
-              className={`rounded border h-16 md:h-20 object-cover overflow-hidden transition-all ${
+              className={`rounded border h-16 md:h-20 object-cover overflow-hidden transition-all relative ${
                 i === currentIndex ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
               }`}
             >
@@ -103,12 +121,23 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
                   </svg>
                 </div>
               ) : (
-                <img
-                  src={img.startsWith("http") ? img : `${API_URL}/uploads/${img}`}
-                  alt={`Image ${i + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={() => handleImageError(i)}
-                />
+                <>
+                  {!imageLoaded[i] && (
+                    <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+                      <svg className="w-3 h-3 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  )}
+                  <img
+                    src={img.startsWith("http") ? img : `${API_URL}/uploads/${img}`}
+                    alt={`Image ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    onLoad={() => handleImageLoad(i)}
+                    onError={() => handleImageError(i)}
+                  />
+                </>
               )}
             </button>
           ))}
