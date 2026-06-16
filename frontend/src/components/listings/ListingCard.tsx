@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Listing } from "@/types";
 import { formatPrice } from "@/lib/utils";
