@@ -16,10 +16,13 @@ export default function ListingCard({ listing }: ListingCardProps) {
   const getImageUrl = (filename: string) => {
     if (!filename) return null;
     if (filename.startsWith("http")) return filename;
-    return `${API_URL}/uploads/${filename}`;
+    const url = `${API_URL}/uploads/${filename}`;
+    console.log("Image URL:", url, "API_URL:", API_URL, "filename:", filename);
+    return url;
   };
 
   const imageUrl = rawImg ? getImageUrl(rawImg) : null;
+  console.log("ListingCard - rawImg:", rawImg, "imageUrl:", imageUrl, "API_URL:", API_URL);
 
   return (
     <Link href={`/listings/${listing.id}`}>
