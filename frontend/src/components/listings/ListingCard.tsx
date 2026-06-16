@@ -11,13 +11,13 @@ interface ListingCardProps {
 export default function ListingCard({ listing }: ListingCardProps) {
   const rawImg = listing.images[0];
 
-  const getImageUrl = (filename: string, size: "thumb" | "medium" | "large" = "medium") => {
+  const getImageUrl = (filename: string) => {
     if (!filename) return null;
     if (filename.startsWith("http")) return filename;
-    return `${API_URL}/uploads/${filename}-${size}.webp`;
+    return `${API_URL}/uploads/${filename}`;
   };
 
-  const imageUrl = rawImg ? getImageUrl(rawImg, "medium") : null;
+  const imageUrl = rawImg ? getImageUrl(rawImg) : null;
 
   return (
     <Link href={`/listings/${listing.id}`}>

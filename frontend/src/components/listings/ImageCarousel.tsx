@@ -21,7 +21,7 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
   }
 
   const currentImage = images[currentIndex];
-  const imageUrl = currentImage.startsWith("http") ? currentImage : `${API_URL}/uploads/${currentImage}-large.webp`;
+  const imageUrl = currentImage.startsWith("http") ? currentImage : `${API_URL}/uploads/${currentImage}`;
 
   const goToPrevious = () => {
     setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
@@ -81,7 +81,7 @@ export default function ImageCarousel({ images, title }: ImageCarouselProps) {
               }`}
             >
               <img
-                src={img.startsWith("http") ? img : `${API_URL}/uploads/${img}-thumb.webp`}
+                src={img.startsWith("http") ? img : `${API_URL}/uploads/${img}`}
                 alt={`Image ${i + 1}`}
                 className="w-full h-full object-cover"
                 onError={(e) => {
