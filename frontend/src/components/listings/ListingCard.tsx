@@ -1,38 +1,45 @@
 import Link from "next/link";
 import { Listing } from "@/types";
-import { formatPrice, formatDate, getCategoryLabel } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface ListingCardProps {
   listing: Listing;
 }
 
 export default function ListingCard({ listing }: ListingCardProps) {
-  const imageUrl = listing.images.length > 0 ? `${API_URL}/uploads/${listing.images[0]}` : null;
+  const rawImg = listing.images[0];
+
+  const getImageUrl = (filename: string, size: "thumb" | "medium" | "large" = "medium") => {
+    if (!filename) return null;
+    if (filename.startsWith("http")) return filename;
+    return `${API_URL}/uploads/${filename}-${size}.webp`;
+  };
+
+  const imageUrl = rawImg ? getImageUrl(rawImg, "medium") : null;
 
   return (
     <Link href={`/listings/${listing.id}`}>
-      <div className="border rounded hover:shadow-lg transition-shadow">
-        {imageUrl && (
-          <img
-            src={imageUrl}
-            alt={listing.title}
-            className="w-full h-48 object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        )}
-        <div className="p-4">
-          <h3 className="font-bold text-lg text-gray-900 truncate">{listing.title}</h3>
-          <p className="text-xl font-bold text-primary mt-1">{formatPrice(listing.price)}</p>
-          <p className="text-sm text-gray-600 mt-2 line-clamp-2">{listing.description}</p>
-          <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
-            <span>{getCategoryLabel(listing.category)}</span>
-            <span>{listing.city}</span>
-            <span>{formatDate(listing.createdAt)}</span>
-          </div>
+      <div className="border rounded hover:shadow-lg transition-shadow cursor-pointer overflow-hidden">
+        <div className="w-full h-40 sm:h-48 bg-gray-200 flex items-center justify-center">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={listing.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <span className="text-gray-500 text-sm">No image</span>
+          )}
+        </div>
+        <div className="p-3 sm:p-4">
+          <p className="text-lg sm:text-xl font-bold text-primary">{formatPrice(listing.price)}</p>
+          <h3 className="font-bold text-sm sm:text-base text-gray-900 truncate mt-1">{listing.title}</h3>
+          <p className="text-xs sm:text-sm text-gray-600 mt-2">{listing.city}</p>
         </div>
       </div>
     </Link>
