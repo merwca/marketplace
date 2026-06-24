@@ -2,46 +2,48 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 import * as api from "@/lib/api";
 import { Listing } from "@/types";
 import ListingGrid from "@/components/listings/ListingGrid";
+import ImageCarousel from "@/components/listings/ImageCarousel";
 import Button from "@/components/ui/Button";
 import Alert from "@/components/ui/Alert";
 import { formatPrice, formatDate, getCategoryLabel } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_URL = "";
 
-interface ListingPageProps {
-  params: { id: string };
-}
-
-export default function ListingPage({ params }: ListingPageProps) {
+export default function ListingPage() {
+  const { id } = useParams<{ id: string }>();
+  const { t } = useI18n();
   const [listing, setListing] = useState<Listing | null>(null);
   const [related, setRelated] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
     setIsLoading(true);
     api
-      .getListing(params.id)
+      .getListing(id)
       .then((res: any) => {
         setListing(res.data.listing);
         setRelated(res.data.related || []);
       })
       .catch((err) => setError(err.message))
       .finally(() => setIsLoading(false));
-  }, [params.id]);
+  }, [id]);
 
   const handleReport = async () => {
     try {
-      const reason = prompt("Why are you reporting this listing?");
+      const reason = prompt(t.listing.reportPrompt);
       if (!reason) return;
 
-      await api.reportListing(params.id, reason);
+      await api.reportListing(id, reason);
       setReported(true);
       setTimeout(() => setReported(false), 5000);
     } catch (err: any) {
@@ -49,110 +51,200 @@ export default function ListingPage({ params }: ListingPageProps) {
     }
   };
 
-  if (isLoading) return <div className="text-center py-8">Loading...</div>;
-  if (error || !listing) return <div className="text-center py-8 text-red-600">{error || "Not found"}</div>;
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, { bg: string; text: string; emoji: string }> = {
+      FOR_SALE: { bg: "bg-blue-100", text: "text-blue-800", emoji: "🛍️" },
+      HOUSING: { bg: "bg-green-100", text: "text-green-800", emoji: "🏠" },
+      JOBS: { bg: "bg-purple-100", text: "text-purple-800", emoji: "💼" },
+      SERVICES: { bg: "bg-orange-100", text: "text-orange-800", emoji: "🔧" },
+      COMMUNITY: { bg: "bg-pink-100", text: "text-pink-800", emoji: "👥" },
+      VEHICLES: { bg: "bg-red-100", text: "text-red-800", emoji: "🚗" },
+      ELECTRONICS: { bg: "bg-indigo-100", text: "text-indigo-800", emoji: "📱" },
+    };
+    return colors[category] || colors.FOR_SALE;
+  };
+
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center py-12">
+        <svg className="w-12 h-12 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    );
+
+  if (error || !listing)
+    return (
+      <div className="text-center py-12 bg-red-50 rounded-lg border border-red-200">
+        <h2 className="text-lg font-bold text-red-800 mb-2">Listing Not Found</h2>
+        <p className="text-red-700 mb-4">{error || t.common.notFound}</p>
+        <Link href="/" className="text-blue-600 hover:text-blue-700 font-medium">
+          ← Back to Home
+        </Link>
+      </div>
+    );
 
   const isOwner = user?.id === listing.userId;
+  const category = getCategoryColor(listing.category);
 
   return (
-    <div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-        <div className="md:col-span-2">
-          {listing.images.length > 0 ? (
-            <img
-              src={`${API_URL}/uploads/${listing.images[0]}`}
-              alt={listing.title}
-              className="w-full rounded border mb-4"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="w-full h-96 bg-gray-200 rounded border flex items-center justify-center mb-4">
-              No image
-            </div>
-          )}
+    <div className="space-y-8">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <Link href="/" className="hover:text-blue-600">
+          Home
+        </Link>
+        <span>›</span>
+        <span className="font-medium text-gray-900">{listing.title.substring(0, 30)}...</span>
+      </div>
 
-          {listing.images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              {listing.images.map((img, i) => (
-                <img
-                  key={i}
-                  src={`${API_URL}/uploads/${img}`}
-                  alt={`Image ${i + 1}`}
-                  className="rounded border h-20 object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ))}
-            </div>
-          )}
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - Images & Description */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Image Carousel */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+            <ImageCarousel images={listing.images} title={listing.title} />
+          </div>
 
-          <div className="bg-white p-6 rounded border mb-6">
-            <h1 className="text-3xl font-bold mb-2">{listing.title}</h1>
-            <p className="text-gray-600 mb-4">
-              {getCategoryLabel(listing.category)} • {listing.city} • {formatDate(listing.createdAt)}
-            </p>
-            <h2 className="text-2xl font-bold text-primary mb-4">{formatPrice(listing.price)}</h2>
-            <div className="prose max-w-none">
+          {/* Title & Price Section */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h1 className="text-3xl font-bold text-gray-900 mb-3">{listing.title}</h1>
+                <div className="flex items-center gap-2">
+                  <span className={`${category.bg} ${category.text} px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1`}>
+                    <span>{category.emoji}</span>
+                    {getCategoryLabel(listing.category)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <p className="text-5xl font-bold text-blue-600 mb-1">{formatPrice(listing.price)}</p>
+              <p className="text-gray-600 text-sm">Posted {formatDate(listing.createdAt)}</p>
+            </div>
+          </div>
+
+          {/* Key Details */}
+          <div className="grid grid-cols-2 gap-4 bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <div>
+                <p className="text-xs text-gray-600">Location</p>
+                <p className="font-semibold text-gray-900">{listing.city}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <div>
+                <p className="text-xs text-gray-600">Posted</p>
+                <p className="font-semibold text-gray-900">{formatDate(listing.createdAt)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Details</h2>
+            <div className="prose max-w-none text-gray-700 leading-relaxed">
               <p className="whitespace-pre-wrap">{listing.description}</p>
             </div>
           </div>
         </div>
 
-        <div>
-          <div className="bg-white p-6 rounded border sticky top-4">
-            <div className="mb-6 pb-6 border-b">
-              <h3 className="font-bold mb-2">Seller</h3>
-              <p className="text-lg font-bold mb-1">{listing.user.name}</p>
-              <a
-                href={`mailto:${listing.contactEmail}`}
-                className="text-primary hover:underline break-all"
-              >
+        {/* Right Column - Seller & CTA */}
+        <div className="space-y-4">
+          {/* Seller Card */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-6 sticky top-4 space-y-6">
+            <div>
+              <p className="text-sm text-gray-600 mb-2 uppercase tracking-wide font-semibold">Seller Information</p>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  {listing.user.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-bold text-lg text-gray-900">{listing.user.name}</p>
+                  <p className="text-xs text-gray-600">Seller</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Button */}
+            <a
+              href={`mailto:${listing.contactEmail}?subject=RE: ${encodeURIComponent(listing.title)}`}
+              className="w-full block bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors text-center text-lg"
+            >
+              📧 Contact Seller
+            </a>
+
+            {/* Seller Email */}
+            <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <p className="text-xs text-gray-600 mb-1">Email</p>
+              <a href={`mailto:${listing.contactEmail}`} className="text-blue-600 hover:text-blue-700 font-medium break-all">
                 {listing.contactEmail}
               </a>
             </div>
 
-            <div className="space-y-2 mb-6">
-              <a
-                href={`mailto:${listing.contactEmail}?subject=RE: ${encodeURIComponent(listing.title)}`}
-                className="w-full block bg-primary text-white text-center py-2 rounded hover:bg-accent"
-              >
-                Contact Seller
-              </a>
-
-              {isOwner && (
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              {isOwner ? (
+                <Link
+                  href={`/listings/${id}/edit`}
+                  className="w-full block bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 transition-colors text-center"
+                >
+                  ✏️ Edit Listing
+                </Link>
+              ) : (
                 <>
-                  <Link
-                    href={`/listings/${params.id}/edit`}
-                    className="w-full block border border-primary text-primary text-center py-2 rounded hover:bg-gray-50"
+                  <button
+                    onClick={() => setIsSaved(!isSaved)}
+                    className={`w-full font-bold py-2 px-4 rounded-lg transition-colors ${
+                      isSaved ? "bg-red-100 text-red-700 border border-red-300" : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
+                    }`}
                   >
-                    Edit
-                  </Link>
+                    {isSaved ? "❤️ Saved" : "🤍 Save Listing"}
+                  </button>
+                  <button
+                    onClick={handleReport}
+                    disabled={reported}
+                    className={`w-full font-bold py-2 px-4 rounded-lg transition-colors ${
+                      reported ? "bg-green-100 text-green-700 border border-green-300" : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
+                    }`}
+                  >
+                    {reported ? "✓ Reported" : "🚩 Report Listing"}
+                  </button>
                 </>
               )}
+            </div>
 
-              {!isOwner && (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={handleReport}
-                  disabled={reported}
-                >
-                  {reported ? "Reported" : "Report"}
-                </Button>
-              )}
+            {/* Safety Tips */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-xs font-bold text-yellow-800 mb-2">💡 Safety Tips</p>
+              <ul className="text-xs text-yellow-800 space-y-1">
+                <li>• Meet in a safe place</li>
+                <li>• Check the item before paying</li>
+                <li>• Never wire money or use gift cards</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
 
-      {reported && <Alert type="success" message="Thank you for reporting this listing" />}
+      {reported && <Alert type="success" message={t.listing.reportedThanks} />}
 
+      {/* Related Listings */}
       {related.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Related Listings</h2>
+        <div className="pt-8 border-t">
+          <h2 className="text-3xl font-bold text-gray-900 mb-6">Similar Listings</h2>
           <ListingGrid listings={related} />
         </div>
       )}
