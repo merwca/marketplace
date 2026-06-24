@@ -12,13 +12,21 @@ model User {
   email     String   @unique
   password  String
   name      String
+  bio       String?
+  avatar    String?
+  language  String   @default("en")
+  theme     String   @default("light")
   role      Role     @default(USER)
   banned    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  listings Listing[]
-  reports  Report[]
+  listings           Listing[]
+  reports            Report[]
+  notificationSettings NotificationSettings?
+  savedListings      SavedListing[]
+  reviewsWritten     Review[] @relation("reviewer")
+  reviewsReceived    Review[] @relation("seller")
 
   @@map("users")
 }
@@ -27,10 +35,10 @@ model Listing {
   id           String   @id @default(cuid())
   title        String
   description  String
-  price        Decimal?
+  price        Float?
   category     Category
   city         String
-  images       String[]
+  images       String   @db.Text
   contactEmail String
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -39,7 +47,9 @@ model Listing {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  reports Report[]
+  reports        Report[]
+  savedByUsers   SavedListing[]
+  reviews        Review[]
 
   @@index([userId])
   @@index([category])
@@ -65,6 +75,56 @@ model Report {
 enum Role {
   USER
   ADMIN
+}
+
+model NotificationSettings {
+  id                  String   @id @default(cuid())
+  emailNotifications  Boolean  @default(true)
+  pushNotifications   Boolean  @default(true)
+  categoryAlerts      String   @default("")
+  sellerNotifications Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+model SavedListing {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@map("saved_listings")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  text      String?
+  createdAt DateTime @default(now())
+
+  reviewerId String
+  reviewer   User   @relation("reviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  sellerId String
+  seller   User   @relation("seller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, sellerId])
+  @@index([sellerId])
+  @@index([reviewerId])
+  @@map("reviews")
 }
 
 enum Category {

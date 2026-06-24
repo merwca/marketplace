@@ -209,3 +209,19 @@ export function getAdminUsers() {
 export function toggleUserBan(id: string) {
   return apiCall(`/api/admin/users/${id}/ban`, { method: "PUT" });
 }
+
+// Reviews
+export function getSellerReviews(sellerId: string) {
+  return apiCall(`/api/reviews/seller/${sellerId}`);
+}
+
+export function createReview(sellerId: string, listingId: string, rating: number, text?: string) {
+  return apiCall("/api/reviews", {
+    method: "POST",
+    body: JSON.stringify({ sellerId, listingId, rating, text }),
+  });
+}
+
+export function deleteReview(reviewId: string) {
+  return apiCall(`/api/reviews/${reviewId}`, { method: "DELETE" });
+}
