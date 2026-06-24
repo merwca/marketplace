@@ -40,9 +40,25 @@ export default function ListingCard({ listing }: ListingCardProps) {
     setImageLoaded(true);
   };
 
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, { bg: string; text: string; emoji: string }> = {
+      FOR_SALE: { bg: "bg-blue-100", text: "text-blue-800", emoji: "🛍️" },
+      HOUSING: { bg: "bg-green-100", text: "text-green-800", emoji: "🏠" },
+      JOBS: { bg: "bg-purple-100", text: "text-purple-800", emoji: "💼" },
+      SERVICES: { bg: "bg-orange-100", text: "text-orange-800", emoji: "🔧" },
+      COMMUNITY: { bg: "bg-pink-100", text: "text-pink-800", emoji: "👥" },
+      VEHICLES: { bg: "bg-red-100", text: "text-red-800", emoji: "🚗" },
+      ELECTRONICS: { bg: "bg-indigo-100", text: "text-indigo-800", emoji: "📱" },
+    };
+    return colors[category] || colors.FOR_SALE;
+  };
+
+  const category = getCategoryColor(listing.category);
+
   return (
     <Link href={`/listings/${listing.id}`}>
-      <div className="border rounded hover:shadow-lg transition-shadow cursor-pointer overflow-hidden">
+      <div className="group bg-white border border-gray-200 rounded-lg hover:shadow-xl hover:border-blue-300 transition-all duration-300 overflow-hidden cursor-pointer h-full flex flex-col">
+        {/* Image Container */}
         <div className="w-full h-40 sm:h-48 bg-gray-100 flex items-center justify-center relative overflow-hidden">
           {imageUrl && !imageError ? (
             <>
@@ -57,7 +73,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
               <img
                 src={imageUrl}
                 alt={listing.title}
-                className="w-full h-full object-cover transition-opacity duration-300"
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 onLoad={handleImageLoad}
                 onError={handleImageError}
               />
@@ -70,11 +86,37 @@ export default function ListingCard({ listing }: ListingCardProps) {
               <span className="text-xs">{imageError ? "Failed to load" : "No image"}</span>
             </div>
           )}
+
+          {/* Category Badge */}
+          <div className={`absolute top-3 right-3 ${category.bg} ${category.text} px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1`}>
+            <span>{category.emoji}</span>
+            <span>New</span>
+          </div>
         </div>
-        <div className="p-3 sm:p-4">
-          <p className="text-lg sm:text-xl font-bold text-primary">{formatPrice(listing.price)}</p>
-          <h3 className="font-bold text-sm sm:text-base text-gray-900 truncate mt-1">{listing.title}</h3>
-          <p className="text-xs sm:text-sm text-gray-600 mt-2">{listing.city}</p>
+
+        {/* Content */}
+        <div className="p-4 flex-1 flex flex-col">
+          {/* Price */}
+          <p className="text-lg sm:text-xl font-bold text-blue-600 mb-2">{formatPrice(listing.price)}</p>
+
+          {/* Title */}
+          <h3 className="font-semibold text-sm sm:text-base text-gray-900 line-clamp-2 mb-3 group-hover:text-blue-600 transition-colors">
+            {listing.title}
+          </h3>
+
+          {/* Location */}
+          <div className="flex items-center gap-1 text-xs text-gray-600 mb-3">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>{listing.city}</span>
+          </div>
+
+          {/* CTA Button */}
+          <button className="mt-auto w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            View Details
+          </button>
         </div>
       </div>
     </Link>
