@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -22,7 +23,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50">
+      <header className="fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50 transition-colors">
         <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
           {/* Logo */}
           <Link href="/" className="flex-shrink-0" onClick={closeMenu}>
@@ -34,12 +35,12 @@ export default function Header() {
           {/* Desktop Search */}
           <Link
             href="/search"
-            className="hidden sm:flex flex-1 max-w-xs items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="hidden sm:flex flex-1 max-w-xs items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span className="text-sm text-gray-600">{t.nav.search}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t.nav.search}</span>
           </Link>
 
           {/* Mobile Menu Button */}
@@ -58,48 +59,8 @@ export default function Header() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-3">
-            {isAuthenticated ? (
-              <>
-                <Link
-                  href="/listings/create"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  ➕ {t.nav.postListing}
-                </Link>
-                <Link href="/dashboard" className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors">
-                  {t.nav.dashboard}
-                </Link>
-                <Link href="/dashboard/settings" className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors">
-                  ⚙️
-                </Link>
-                {user?.role === "ADMIN" && (
-                  <Link href="/admin" className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors">
-                    🔐 Admin
-                  </Link>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  {t.nav.logout}
-                </button>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  {t.nav.login}
-                </Link>
-                <Link
-                  href="/register"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  {t.nav.signUp}
-                </Link>
-              </>
-            )}
+            <ThemeToggle />
+            <p className="text-xs text-gray-500 dark:text-gray-400">Demo Mode</p>
           </div>
         </div>
       </header>
@@ -109,7 +70,7 @@ export default function Header() {
       )}
 
       <div
-        className={`fixed top-16 left-0 right-0 bg-white border-b md:hidden z-40 transform transition-all duration-200 ${
+        className={`fixed top-16 left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-700 md:hidden z-40 transform transition-all duration-200 ${
           isMenuOpen ? "translate-y-0" : "-translate-y-full"
         }`}
       >
@@ -117,48 +78,7 @@ export default function Header() {
           <Link href="/search" className="block text-sm text-gray-700 hover:text-primary py-2">
             {t.nav.search}
           </Link>
-
-          {isAuthenticated ? (
-            <>
-              <Link href="/listings/create" className="block text-sm text-gray-700 hover:text-primary py-2">
-                {t.nav.postListing}
-              </Link>
-              <Link href="/dashboard" className="block text-sm text-gray-700 hover:text-primary py-2">
-                {t.nav.dashboard}
-              </Link>
-              <Link href="/dashboard/settings" className="block text-sm text-gray-700 hover:text-primary py-2">
-                Settings
-              </Link>
-              {user?.role === "ADMIN" && (
-                <Link href="/admin" className="block text-sm text-gray-700 hover:text-primary py-2">
-                  {t.nav.admin}
-                </Link>
-              )}
-              <button
-                onClick={handleLogout}
-                className="w-full text-left px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100"
-              >
-                {t.nav.logout}
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className="block w-full text-center px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100"
-                onClick={closeMenu}
-              >
-                {t.nav.login}
-              </Link>
-              <Link
-                href="/register"
-                className="block w-full text-center px-3 py-2 text-sm bg-primary text-white rounded hover:bg-accent"
-                onClick={closeMenu}
-              >
-                {t.nav.signUp}
-              </Link>
-            </>
-          )}
+          <p className="text-xs text-gray-500 py-2">Demo mode - Browse listings</p>
         </div>
       </div>
 

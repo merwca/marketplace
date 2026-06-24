@@ -19,6 +19,12 @@ body {
   color: #1f2937;
   font-family: 'Inter', sans-serif;
   line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
 }
 
 /* Headings with Poppins for more personality */
