@@ -8,6 +8,9 @@ import * as api from "@/lib/api";
 import { Listing } from "@/types";
 import ListingGrid from "@/components/listings/ListingGrid";
 import ImageCarousel from "@/components/listings/ImageCarousel";
+import SellerRating from "@/components/reviews/SellerRating";
+import ReviewList from "@/components/reviews/ReviewList";
+import ReviewForm from "@/components/reviews/ReviewForm";
 import Button from "@/components/ui/Button";
 import Alert from "@/components/ui/Alert";
 import { formatPrice, formatDate, getCategoryLabel } from "@/lib/utils";
@@ -15,28 +18,72 @@ import { useAuth } from "@/lib/auth";
 
 const API_URL = "";
 
+interface ReviewData {
+  id: string;
+  rating: number;
+  text?: string;
+  createdAt: string;
+  reviewer: {
+    id: string;
+    name: string;
+  };
+}
+
+interface SellerStats {
+  totalReviews: number;
+  averageRating: number;
+  ratingBreakdown: {
+    5: number;
+    4: number;
+    3: number;
+    2: number;
+    1: number;
+  };
+}
+
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
   const [listing, setListing] = useState<Listing | null>(null);
   const [related, setRelated] = useState<Listing[]>([]);
+  const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [sellerStats, setSellerStats] = useState<SellerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [error, setError] = useState("");
   const [reported, setReported] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const { user } = useAuth();
+  const [reviewSubmitError, setReviewSubmitError] = useState("");
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     setIsLoading(true);
-    api
-      .getListing(id)
-      .then((res: any) => {
-        setListing(res.data.listing);
-        setRelated(res.data.related || []);
+    Promise.all([
+      api.getListing(id),
+    ])
+      .then(([listingRes]: any) => {
+        setListing(listingRes.data.listing);
+        setRelated(listingRes.data.related || []);
+
+        // Fetch reviews for the seller
+        fetchSellerReviews(listingRes.data.listing.userId);
       })
       .catch((err) => setError(err.message))
       .finally(() => setIsLoading(false));
   }, [id]);
+
+  const fetchSellerReviews = async (sellerId: string) => {
+    try {
+      setIsLoadingReviews(true);
+      const res: any = await api.getSellerReviews(sellerId);
+      setReviews(res.data.reviews);
+      setSellerStats(res.data.stats);
+    } catch (err) {
+      console.error("Failed to load reviews:", err);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  };
 
   const handleReport = async () => {
     try {
@@ -48,6 +95,31 @@ export default function ListingPage() {
       setTimeout(() => setReported(false), 5000);
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  const handleReviewSubmit = async (rating: number, text: string) => {
+    if (!listing) return;
+    try {
+      setReviewSubmitError("");
+      await api.createReview(listing.userId, id, rating, text);
+
+      // Refresh reviews
+      await fetchSellerReviews(listing.userId);
+    } catch (err: any) {
+      setReviewSubmitError(err.message || "Failed to submit review");
+      throw err;
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!listing) return;
+    try {
+      await api.deleteReview(reviewId);
+      // Refresh reviews
+      await fetchSellerReviews(listing.userId);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete review");
     }
   };
 
@@ -178,6 +250,17 @@ export default function ListingPage() {
               </div>
             </div>
 
+            {/* Seller Rating */}
+            {sellerStats && (
+              <div className="bg-white rounded-lg border border-blue-200 p-4">
+                <SellerRating
+                  averageRating={sellerStats.averageRating}
+                  totalReviews={sellerStats.totalReviews}
+                  ratingBreakdown={sellerStats.ratingBreakdown}
+                />
+              </div>
+            )}
+
             {/* Contact Button */}
             <a
               href={`mailto:${listing.contactEmail}?subject=RE: ${encodeURIComponent(listing.title)}`}
@@ -240,6 +323,51 @@ export default function ListingPage() {
       </div>
 
       {reported && <Alert type="success" message={t.listing.reportedThanks} />}
+
+      {/* Reviews Section */}
+      {listing && (
+        <div className="pt-8 border-t space-y-8">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-8">⭐ Seller Reviews</h2>
+
+            {/* Review Form for Non-Owners */}
+            {isAuthenticated && !isOwner && (
+              <div className="mb-8">
+                <ReviewForm
+                  sellerId={listing.userId}
+                  listingId={id}
+                  onSubmit={handleReviewSubmit}
+                  isSubmitting={isLoadingReviews}
+                />
+                {reviewSubmitError && (
+                  <Alert type="error" message={reviewSubmitError} />
+                )}
+              </div>
+            )}
+
+            {/* Reviews List */}
+            {isLoadingReviews ? (
+              <div className="text-center py-8">
+                <svg className="w-8 h-8 text-blue-600 animate-spin mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            ) : reviews.length > 0 ? (
+              <ReviewList
+                reviews={reviews}
+                onDeleteReview={handleDeleteReview}
+                currentUserId={user?.id}
+              />
+            ) : (
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-8 text-center">
+                <p className="text-gray-600 text-lg mb-3">No reviews yet</p>
+                <p className="text-gray-500">Be the first to review this seller!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Related Listings */}
       {related.length > 0 && (
